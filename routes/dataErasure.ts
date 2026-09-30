@@ -101,8 +101,27 @@ router.post('/', (req: Request<Record<string, unknown>, Record<string, unknown>,
       }
 
       if (req.body.layout) {
-        const filePath: string = path.resolve(req.body.layout).toLowerCase()
-        const isForbiddenFile: boolean = (filePath.includes('ftp') || filePath.includes('ctf.key') || filePath.includes('encryptionkeys'))
+        if (typeof req.body.layout !== 'string') {
+          next(new Error('File access not allowed'))
+          return
+        }
+        let layoutParam: string = req.body.layout
+        try {
+          layoutParam = decodeURIComponent(layoutParam)
+        } catch {
+          // ignore malformed URI components
+        }
+        layoutParam = layoutParam.replace(/\\/g, '/')
+        const allowedDirectory: string = (typeof __dirname !== 'undefined'
+          ? path.resolve(__dirname, '../views')
+          : path.resolve('views')).toLowerCase()
+        const resolvedLayout: string = path.resolve(layoutParam).toLowerCase()
+        const resolvedRelative: string = path.resolve(allowedDirectory, layoutParam).toLowerCase()
+        const filePath: string = resolvedLayout.startsWith(allowedDirectory + path.sep) ? resolvedLayout : resolvedRelative
+        const isForbiddenFile: boolean = (
+          !filePath.startsWith(allowedDirectory + path.sep) ||
+          filePath.includes('ftp') || filePath.includes('ctf.key') || filePath.includes('encryptionkeys')
+        )
         if (!isForbiddenFile) {
           res.render('dataErasureResult', {
             ...req.body,
